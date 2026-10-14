@@ -1,0 +1,268 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>CSP Co-Term Calculator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: inputs panel left, live results panel right; stacks to one column on phones. */
+  :root {
+    --bg: #F1F5F6;
+    --surface: #FFFFFF;
+    --ink: #14232B;
+    --muted: #55666F;
+    --line: #D3DDE1;
+    --field: #FFFFFF;
+    --accent: #0A6B66;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #E1F1EF;
+    --warn-bg: #FBEFD9;
+    --warn-ink: #6B4A07;
+    --font-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F1A1F; --surface: #16252C; --ink: #E6EEF1; --muted: #93A5AE; --line: #2A3C44;
+      --field: #0F1A1F; --accent: #4FC3BB; --accent-ink: #08191B; --accent-soft: #14322F;
+      --warn-bg: #3A2D10; --warn-ink: #F1D391;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1A1F; --surface: #16252C; --ink: #E6EEF1; --muted: #93A5AE; --line: #2A3C44;
+    --field: #0F1A1F; --accent: #4FC3BB; --accent-ink: #08191B; --accent-soft: #14322F;
+    --warn-bg: #3A2D10; --warn-ink: #F1D391;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+    padding-block: 28px 40px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  header h1 { font-size: 1.5rem; line-height: 1.2; margin: 0 0 4px; font-weight: 650; text-wrap: balance; }
+  header p { margin: 0; color: var(--muted); max-width: 62ch; }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 780px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 20px; min-width: 0; }
+  .panel h2 { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0 0 16px; }
+
+  form { display: flex; flex-direction: column; gap: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .field label, .field .lbl { font-size: 0.85rem; font-weight: 600; }
+  .hint { font-size: 0.78rem; color: var(--muted); font-weight: 400; }
+  .row { display: flex; gap: 8px; align-items: stretch; }
+  .affix { position: relative; flex: 1; min-width: 0; }
+  .affix input { width: 100%; }
+  .affix .pre, .affix .suf { position: absolute; top: 50%; transform: translateY(-50%); color: var(--muted); font-family: var(--font-num); pointer-events: none; }
+  .affix .pre { left: 12px; }
+  .affix .suf { right: 12px; }
+  .affix.has-pre input { padding-left: 28px; }
+  .affix.has-suf input { padding-right: 32px; }
+
+  input[type="number"], input[type="date"] {
+    font: inherit;
+    font-family: var(--font-num);
+    font-size: 0.95rem;
+    color: var(--ink);
+    background: var(--field);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 9px 12px;
+    min-width: 0;
+  }
+  input:focus-visible, .seg input:focus-visible + span, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; background: var(--field); }
+  .seg label { position: relative; cursor: pointer; font-weight: 500; }
+  .seg input { position: absolute; opacity: 0; inset: 0; }
+  .seg span { display: block; text-align: center; padding: 9px 12px; }
+  .seg input:checked + span { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+  .linkbtn { font: inherit; font-size: 0.85rem; color: var(--accent); background: none; border: 1px solid var(--line); border-radius: 4px; padding: 0 12px; cursor: pointer; white-space: nowrap; }
+
+  .total { display: flex; flex-direction: column; gap: 2px; padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+  .total .k { font-size: 0.85rem; color: var(--muted); }
+  .total .v { font-family: var(--font-num); font-size: clamp(2rem, 7vw, 2.9rem); font-weight: 500; line-height: 1.1; letter-spacing: -0.02em; }
+  .total .sub { font-size: 0.85rem; color: var(--muted); }
+
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 0 12px 8px 0; white-space: nowrap; }
+  td { padding: 11px 12px 11px 0; border-top: 1px solid var(--line); vertical-align: baseline; }
+  th.num, td.num { text-align: right; padding-right: 0; }
+  td.num { font-family: var(--font-num); white-space: nowrap; }
+  td .tag { display: inline-block; font-size: 0.72rem; background: var(--accent-soft); color: var(--accent); border-radius: 3px; padding: 1px 6px; margin-left: 6px; font-weight: 600; }
+  td.dates { font-family: var(--font-num); font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+  tr.sum td { border-top: 2px solid var(--ink); font-weight: 600; }
+
+  .trace { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+  .trace h3 { margin: 0 0 4px; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .trace div { font-family: var(--font-num); font-size: 0.85rem; overflow-wrap: anywhere; }
+
+  .msg { background: var(--warn-bg); color: var(--warn-ink); border-radius: 4px; padding: 12px 14px; font-size: 0.9rem; }
+  .note { margin: 14px 0 0; font-size: 0.8rem; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>CSP Co-Term Calculator</h1>
+    <p>Partner cost for a co-termed order under the growth margin model. Year 1 is prorated from the order date to the first co-term anniversary. Later years bill in full.</p>
+  </header>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="in-h">
+      <h2 id="in-h">Inputs</h2>
+      <form id="f" onsubmit="return false">
+        <div class="field">
+          <label for="erp">Annual MS ERP unit price</label>
+          <div class="affix has-pre"><span class="pre">$</span><input id="erp" type="number" min="0" step="0.01" value="720" inputmode="decimal"></div>
+          <span class="hint">List price per license per year, for example M365 E5.</span>
+        </div>
+        <div class="field">
+          <label for="disc">Growth margin discount</label>
+          <div class="affix has-suf"><input id="disc" type="number" min="0" max="100" step="0.01" value="40" inputmode="decimal"><span class="suf">%</span></div>
+        </div>
+        <div class="field">
+          <span class="lbl" id="term-l">Term duration</span>
+          <div class="seg" role="radiogroup" aria-labelledby="term-l">
+            <label><input type="radio" name="term" value="1"><span>Annual</span></label>
+            <label><input type="radio" name="term" value="3" checked><span>Triennial</span></label>
+          </div>
+        </div>
+        <div class="field">
+          <label for="qty">Quantity</label>
+          <input id="qty" type="number" min="0" step="1" value="100" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="order">Order date</label>
+          <div class="row">
+            <input id="order" type="date" value="2026-10-14" style="flex:1">
+            <button type="button" class="linkbtn" id="today">Today</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="coterm">Co-term date</label>
+          <input id="coterm" type="date" value="2029-05-14">
+          <span class="hint">The end date of the agreement you are co-terming to.</span>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel" aria-labelledby="out-h" aria-live="polite">
+      <h2 id="out-h">Co-term cost</h2>
+      <div id="out"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+  // ---- calculation (pure functions) ----
+  function parseISO(s) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s || "")) return null;
+    var p = s.split("-").map(Number);
+    return Date.UTC(p[0], p[1] - 1, p[2]);
+  }
+  function addMonths(t, n) {
+    var d = new Date(t);
+    var y = d.getUTCFullYear(), m = d.getUTCMonth() + n, day = d.getUTCDate();
+    var ty = y + Math.floor(m / 12), tm = ((m % 12) + 12) % 12;
+    var last = new Date(Date.UTC(ty, tm + 1, 0)).getUTCDate();
+    return Date.UTC(ty, tm, Math.min(day, last));
+  }
+  function monthsBetween(a, b) {
+    if (b <= a) return 0;
+    var da = new Date(a), db = new Date(b);
+    var m = (db.getUTCFullYear() - da.getUTCFullYear()) * 12 + (db.getUTCMonth() - da.getUTCMonth());
+    if (addMonths(a, m) > b) m--;
+    var s = addMonths(a, m), n = addMonths(a, m + 1);
+    return m + (b - s) / (n - s);
+  }
+  function round2(x) { return Math.round((x + Number.EPSILON) * 100) / 100; }
+  function calc(i) {
+    var years = i.years;
+    var y1End = addMonths(i.coterm, -12 * (years - 1));
+    if (y1End <= i.order) return { error: years === 3
+      ? "The co-term date is too close. For a triennial term it must be more than 2 years after the order date."
+      : "The co-term date must be after the order date." };
+    if (y1End > addMonths(i.order, 12)) return { error: years === 3
+      ? "The co-term date is too far out. For a triennial term it must be within 3 years of the order date."
+      : "The co-term date is too far out. For an annual term it must be within 12 months of the order date." };
+    var unit = i.erp * (1 - i.disc / 100);
+    var annual = unit * i.qty;
+    var stub = monthsBetween(i.order, y1End);
+    var rows = [{ label: "Year 1", co: true, start: i.order, end: y1End, months: stub, cost: round2(annual * stub / 12) }];
+    for (var k = 1; k < years; k++) {
+      var s = addMonths(y1End, 12 * (k - 1));
+      rows.push({ label: "Year " + (k + 1), co: false, start: s, end: addMonths(s, 12), months: 12, cost: round2(annual) });
+    }
+    var total = rows.reduce(function (t, r) { return t + r.cost; }, 0);
+    return { unit: unit, annual: annual, stub: stub, rows: rows, total: round2(total) };
+  }
+  // ---- end calculation ----
+
+  var $ = function (id) { return document.getElementById(id); };
+  var cur = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+  var cur0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  function money(x) { return Math.abs(x - Math.round(x)) < 0.005 ? cur0.format(x) : cur.format(x); }
+  function fmtDate(t) { var d = new Date(t); return (d.getUTCMonth() + 1) + "/" + d.getUTCDate() + "/" + d.getUTCFullYear(); }
+  function fmtMo(m) { return (Math.round(m * 100) / 100).toString(); }
+  function pct(x) { return (Math.round(x * 100) / 100).toString() + "%"; }
+
+  function render() {
+    var years = Number(document.querySelector('input[name="term"]:checked').value);
+    var order = parseISO($("order").value), coterm = parseISO($("coterm").value);
+    var erp = parseFloat($("erp").value), disc = parseFloat($("disc").value), qty = parseInt($("qty").value, 10);
+    var out = $("out");
+    if (order === null || coterm === null || !(erp >= 0) || !(disc >= 0 && disc <= 100) || !(qty >= 0)) {
+      out.innerHTML = '<div class="msg">Enter a price, a discount from 0 to 100%, a quantity, and both dates to see the cost.</div>';
+      return;
+    }
+    var r = calc({ years: years, order: order, coterm: coterm, erp: erp, disc: disc, qty: qty });
+    if (r.error) { out.innerHTML = '<div class="msg">' + r.error + '</div>'; return; }
+
+    var rows = r.rows.map(function (x) {
+      return "<tr><td>" + x.label + (x.co ? '<span class="tag">Co-term</span>' : "") + "</td>" +
+        '<td class="dates">' + fmtDate(x.start) + " to " + fmtDate(x.end) + "</td>" +
+        '<td class="num">' + fmtMo(x.months) + "</td>" +
+        '<td class="num">' + money(x.cost) + "</td></tr>";
+    }).join("");
+
+    var sub = years === 3
+      ? "Year 1 " + money(r.rows[0].cost) + ", then " + money(r.rows[1].cost) + " in each of years 2 and 3"
+      : "Prorated from " + fmtDate(order) + " to " + fmtDate(r.rows[0].end);
+    var head = years === 3 ? "Total co-term cost, all 3 years" : "Total co-term cost, year 1";
+
+    out.innerHTML =
+      '<div class="total"><span class="k">' + head + '</span><span class="v">' + money(r.total) + '</span><span class="sub">' + sub + "</span></div>" +
+      '<div class="tablewrap"><table><thead><tr><th>Period</th><th>Dates</th><th class="num">Months</th><th class="num">Cost</th></tr></thead><tbody>' +
+      rows +
+      (years === 3 ? '<tr class="sum"><td>Total</td><td></td><td class="num">' + fmtMo(r.rows.reduce(function (t, x) { return t + x.months; }, 0)) + '</td><td class="num">' + money(r.total) + "</td></tr>" : "") +
+      "</tbody></table></div>" +
+      '<div class="trace"><h3>How it was calculated</h3>' +
+      "<div>" + cur.format(erp) + " × (1 − " + pct(disc) + ") = " + cur.format(r.unit) + " per license per year</div>" +
+      "<div>" + cur.format(r.unit) + " × " + qty.toLocaleString("en-US") + " licenses = " + cur.format(r.annual) + " per year</div>" +
+      "<div>Year 1: " + cur.format(r.annual) + " × " + fmtMo(r.stub) + " ÷ 12 = " + cur.format(r.rows[0].cost) + "</div>" +
+      "</div>" +
+      (years === 1 ? '<p class="note">After the co-term period, the next full annual term is ' + money(r.annual) + ".</p>" : "");
+  }
+
+  function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  $("today").addEventListener("click", function () { $("order").value = todayISO(); render(); });
+  $("f").addEventListener("input", render);
+  $("f").addEventListener("change", render);
+  render();
+</script>
+
+</body></html>
